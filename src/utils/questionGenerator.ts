@@ -37,5 +37,4 @@ export const generateReflectionQuestions = (userProfile: UserProfile): Reflectio
     const typeQuestions = reflectionQuestions.filter(q => q.riasecFocus === type);
     
     // Select questions from each context
-    const contexts = ['development', 'performance', 'career_planning'];
-    contexts
+    const contexts = ['development', 'performance', 'career_
