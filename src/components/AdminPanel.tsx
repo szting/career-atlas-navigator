@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Upload, FileText, Users, BarChart3, Settings, X, Check, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Users, BarChart3, Settings, X, Check, AlertCircle, Key, Database, Download, Eye } from 'lucide-react';
+import { UploadedFile, FileValidationResult, SkillsFramework, CoachingExercise } from '../types/admin';
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -14,6 +15,110 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'analytics' | 'settings'>('upload');
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ type: null, message: '' });
   const [dragActive, setDragActive] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [selectedFileType, setSelectedFileType] = useState<'skills-framework' | 'coaching-exercises' | 'career-data'>('skills-framework');
+  const [validationResult, setValidationResult] = useState<FileValidationResult | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const validateFileContent = async (file: File, type: string): Promise<FileValidationResult> => {
+    const text = await file.text();
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let data: any;
+    let recordCount = 0;
+    let preview: any[] = [];
+
+    try {
+      if (file.name.endsWith('.json')) {
+        data = JSON.parse(text);
+      } else if (file.name.endsWith('.csv')) {
+        // Simple CSV parsing for demo
+        const lines = text.split('\n').filter(line => line.trim());
+        const headers = lines[0]?.split(',').map(h => h.trim());
+        data = lines.slice(1).map(line => {
+          const values = line.split(',').map(v => v.trim());
+          const obj: any = {};
+          headers?.forEach((header, index) => {
+            obj[header] = values[index] || '';
+          });
+          return obj;
+        });
+      } else {
+        errors.push('Unsupported file format. Please use JSON or CSV.');
+        return { isValid: false, errors, warnings, recordCount: 0, preview: [] };
+      }
+
+      // Validate based on file type
+      switch (type) {
+        case 'skills-framework':
+          if (Array.isArray(data)) {
+            recordCount = data.length;
+            preview = data.slice(0, 3);
+            
+            data.forEach((item: any, index: number) => {
+              if (!item.id) errors.push(`Row ${index + 1}: Missing required field 'id'`);
+              if (!item.name) errors.push(`Row ${index + 1}: Missing required field 'name'`);
+              if (!item.description) warnings.push(`Row ${index + 1}: Missing description`);
+            });
+          } else if (data.categories) {
+            // Single framework object
+            recordCount = 1;
+            preview = [data];
+            if (!data.name) errors.push('Framework missing required field: name');
+            if (!data.categories || !Array.isArray(data.categories)) {
+              errors.push('Framework missing categories array');
+            }
+          } else {
+            errors.push('Invalid skills framework format');
+          }
+          break;
+
+        case 'coaching-exercises':
+          if (Array.isArray(data)) {
+            recordCount = data.length;
+            preview = data.slice(0, 3);
+            
+            data.forEach((item: any, index: number) => {
+              if (!item.id) errors.push(`Exercise ${index + 1}: Missing required field 'id'`);
+              if (!item.title) errors.push(`Exercise ${index + 1}: Missing required field 'title'`);
+              if (!item.category) errors.push(`Exercise ${index + 1}: Missing required field 'category'`);
+              if (!item.questions || !Array.isArray(item.questions)) {
+                warnings.push(`Exercise ${index + 1}: Missing or invalid questions array`);
+              }
+            });
+          } else {
+            errors.push('Expected array of coaching exercises');
+          }
+          break;
+
+        case 'career-data':
+          if (Array.isArray(data)) {
+            recordCount = data.length;
+            preview = data.slice(0, 3);
+            
+            data.forEach((item: any, index: number) => {
+              if (!item.id) errors.push(`Career ${index + 1}: Missing required field 'id'`);
+              if (!item.title) errors.push(`Career ${index + 1}: Missing required field 'title'`);
+              if (!item.primaryType) warnings.push(`Career ${index + 1}: Missing RIASEC primary type`);
+            });
+          } else {
+            errors.push('Expected array of career objects');
+          }
+          break;
+      }
+
+    } catch (error) {
+      errors.push(`File parsing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      recordCount,
+      preview
+    };
+  };
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -24,35 +129,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     if (!file.name.endsWith('.json') && !file.name.endsWith('.csv')) {
       setUploadStatus({
         type: 'error',
-        message: 'Please upload a JSON or CSV file containing career data.'
+        message: 'Please upload a JSON or CSV file.'
       });
       return;
     }
 
-    setUploadStatus({ type: 'loading', message: 'Processing file...' });
+    setUploadStatus({ type: 'loading', message: 'Validating file...' });
 
     try {
-      const text = await file.text();
-      
-      if (file.name.endsWith('.json')) {
-        const data = JSON.parse(text);
-        // Validate JSON structure
-        if (!Array.isArray(data) || !data.every(item => item.id && item.title)) {
-          throw new Error('Invalid JSON format. Expected array of career objects with id and title.');
-        }
+      // Validate file content
+      const validation = await validateFileContent(file, selectedFileType);
+      setValidationResult(validation);
+
+      if (!validation.isValid) {
+        setUploadStatus({
+          type: 'error',
+          message: `Validation failed: ${validation.errors.join(', ')}`
+        });
+        return;
       }
+
+      setUploadStatus({ type: 'loading', message: 'Processing file...' });
 
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      setUploadStatus({
-        type: 'success',
-        message: `Successfully uploaded ${file.name}. ${file.name.endsWith('.json') ? JSON.parse(text).length : 'Multiple'} career records processed.`
-      });
+      // Create uploaded file record
+      const uploadedFile: UploadedFile = {
+        id: Date.now().toString(),
+        name: file.name,
+        type: selectedFileType,
+        size: file.size,
+        uploadDate: new Date().toISOString(),
+        status: 'completed',
+        recordCount: validation.recordCount
+      };
+
+      setUploadedFiles(prev => [uploadedFile, ...prev]);
 
       // Store in localStorage for demo purposes
-      localStorage.setItem('uploadedCareerData', text);
+      const storageKey = `uploaded_${selectedFileType}_${uploadedFile.id}`;
+      const text = await file.text();
+      localStorage.setItem(storageKey, text);
       localStorage.setItem('lastUploadTime', new Date().toISOString());
+
+      setUploadStatus({
+        type: 'success',
+        message: `Successfully uploaded ${file.name}. ${validation.recordCount} records processed.`
+      });
 
     } catch (error) {
       setUploadStatus({
@@ -92,17 +216,106 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
-  const lastUpload = localStorage.getItem('lastUploadTime');
+  const downloadTemplate = (type: string) => {
+    let template: any;
+    let filename: string;
+
+    switch (type) {
+      case 'skills-framework':
+        template = {
+          name: "Sample Skills Framework",
+          description: "A sample framework for demonstration",
+          version: "1.0",
+          categories: [
+            {
+              id: "technical",
+              name: "Technical Skills",
+              description: "Core technical competencies",
+              riasecAlignment: ["investigative", "realistic"],
+              skills: [
+                {
+                  id: "programming",
+                  name: "Programming",
+                  description: "Software development skills",
+                  level: "intermediate",
+                  relatedCareers: ["software-engineer", "data-scientist"]
+                }
+              ]
+            }
+          ]
+        };
+        filename = 'skills-framework-template.json';
+        break;
+
+      case 'coaching-exercises':
+        template = [
+          {
+            id: "career-values",
+            title: "Career Values Assessment",
+            description: "Explore what matters most in your career",
+            category: "self-reflection",
+            riasecFocus: ["social", "enterprising"],
+            duration: 15,
+            instructions: [
+              "Reflect on your core work values",
+              "Rank them in order of importance",
+              "Consider how they align with your current role"
+            ],
+            questions: [
+              {
+                id: "q1",
+                question: "What aspects of work energize you most?",
+                type: "open-ended",
+                purpose: "Identify intrinsic motivators"
+              }
+            ]
+          }
+        ];
+        filename = 'coaching-exercises-template.json';
+        break;
+
+      case 'career-data':
+        template = [
+          {
+            id: "sample-career",
+            title: "Sample Career Title",
+            description: "Brief description of the career",
+            primaryType: "investigative",
+            secondaryType: "realistic",
+            requiredSkills: ["skill1", "skill2"],
+            workEnvironment: ["office", "remote"],
+            salaryRange: "$50,000 - $100,000",
+            growthOutlook: "Faster than average",
+            education: "Bachelor's degree"
+          }
+        ];
+        filename = 'career-data-template.json';
+        break;
+
+      default:
+        return;
+    }
+
+    const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold">Admin Panel</h2>
-              <p className="text-purple-100">Manage career data and system settings</p>
+              <p className="text-purple-100">Manage career data, analytics, and system settings</p>
             </div>
             <button
               onClick={onClose}
@@ -117,9 +330,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
             {[
-              { id: 'upload', label: 'File Upload', icon: Upload },
+              { id: 'upload', label: 'Data Management', icon: Database },
               { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-              { id: 'settings', label: 'Settings', icon: Settings }
+              { id: 'settings', label: 'API Settings', icon: Key }
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -142,10 +355,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'upload' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload Career Data</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Data Management</h3>
                 <p className="text-gray-600 mb-4">
-                  Upload JSON or CSV files containing career information to update the system database.
+                  Upload and manage skills frameworks, coaching exercises, and career data.
                 </p>
+              </div>
+
+              {/* File Type Selection */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-3">Select Data Type</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { id: 'skills-framework', label: 'Skills Framework', desc: 'Skill categories and competencies' },
+                    { id: 'coaching-exercises', label: 'Coaching Exercises', desc: 'Guided reflection activities' },
+                    { id: 'career-data', label: 'Career Data', desc: 'Job roles and requirements' }
+                  ].map(({ id, label, desc }) => (
+                    <button
+                      key={id}
+                      onClick={() => setSelectedFileType(id as any)}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        selectedFileType === id
+                          ? 'border-purple-500 bg-purple-50 text-purple-900'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Upload Area */}
@@ -162,25 +400,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               >
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <h4 className="text-lg font-medium text-gray-900 mb-2">
-                  Drop files here or click to upload
+                  Drop {selectedFileType.replace('-', ' ')} files here
                 </h4>
                 <p className="text-gray-600 mb-4">
                   Supports JSON and CSV files up to 10MB
                 </p>
-                <input
-                  type="file"
-                  accept=".json,.csv"
-                  onChange={(e) => handleFileUpload(e.target.files)}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Choose File
-                </label>
+                <div className="flex items-center justify-center space-x-3">
+                  <input
+                    type="file"
+                    accept=".json,.csv"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Choose File
+                  </label>
+                  <button
+                    onClick={() => downloadTemplate(selectedFileType)}
+                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Template
+                  </button>
+                </div>
               </div>
 
               {/* Upload Status */}
@@ -195,22 +442,88 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 </div>
               )}
 
-              {/* File Format Guide */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-2">Expected File Format</h4>
-                <div className="text-sm text-gray-600 space-y-2">
-                  <p><strong>JSON:</strong> Array of career objects with required fields: id, title, description, primaryType</p>
-                  <p><strong>CSV:</strong> Headers should include: id, title, description, primaryType, salaryRange, education</p>
-                </div>
-              </div>
+              {/* Validation Results */}
+              {validationResult && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">Validation Results</h4>
+                    {validationResult.preview.length > 0 && (
+                      <button
+                        onClick={() => setShowPreview(!showPreview)}
+                        className="flex items-center text-sm text-purple-600 hover:text-purple-700"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        {showPreview ? 'Hide' : 'Show'} Preview
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">Records:</span>
+                      <span>{validationResult.recordCount}</span>
+                    </div>
+                    
+                    {validationResult.errors.length > 0 && (
+                      <div>
+                        <span className="font-medium text-red-600">Errors:</span>
+                        <ul className="list-disc list-inside text-red-600 ml-2">
+                          {validationResult.errors.map((error, index) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {validationResult.warnings.length > 0 && (
+                      <div>
+                        <span className="font-medium text-yellow-600">Warnings:</span>
+                        <ul className="list-disc list-inside text-yellow-600 ml-2">
+                          {validationResult.warnings.map((warning, index) => (
+                            <li key={index}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
 
-              {/* Last Upload Info */}
-              {lastUpload && (
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-1">Last Upload</h4>
-                  <p className="text-sm text-blue-700">
-                    {new Date(lastUpload).toLocaleString()}
-                  </p>
+                  {showPreview && validationResult.preview.length > 0 && (
+                    <div className="mt-4 p-3 bg-white rounded border">
+                      <h5 className="font-medium text-gray-900 mb-2">Data Preview</h5>
+                      <pre className="text-xs text-gray-600 overflow-x-auto">
+                        {JSON.stringify(validationResult.preview, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Uploaded Files List */}
+              {uploadedFiles.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Recent Uploads</h4>
+                  <div className="space-y-2">
+                    {uploadedFiles.slice(0, 5).map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-4 h-4 text-gray-500" />
+                          <div>
+                            <div className="font-medium text-sm">{file.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {file.type.replace('-', ' ')} • {file.recordCount} records • {new Date(file.uploadDate).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`px-2 py-1 rounded text-xs font-medium ${
+                          file.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          file.status === 'error' ? 'bg-red-100 text-red-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {file.status}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -219,59 +532,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">System Analytics</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Analytics Dashboard</h3>
                 <p className="text-gray-600 mb-4">
-                  Overview of assessment usage and career recommendation patterns.
+                  Coming in Part 2: Skills confidence vs career interests incongruence analysis
                 </p>
               </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-blue-600">Total Assessments</p>
-                      <p className="text-2xl font-bold text-blue-900">1,247</p>
-                    </div>
-                    <Users className="w-8 h-8 text-blue-500" />
-                  </div>
-                </div>
-
-                <div className="bg-green-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-600">Career Paths</p>
-                      <p className="text-2xl font-bold text-green-900">156</p>
-                    </div>
-                    <BarChart3 className="w-8 h-8 text-green-500" />
-                  </div>
-                </div>
-
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-purple-600">Completion Rate</p>
-                      <p className="text-2xl font-bold text-purple-900">87%</p>
-                    </div>
-                    <BarChart3 className="w-8 h-8 text-purple-500" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-3">Popular Career Types</h4>
-                <div className="space-y-2">
-                  {['Investigative (32%)', 'Artistic (24%)', 'Social (18%)', 'Enterprising (15%)', 'Realistic (11%)'].map((item, index) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{item}</span>
-                      <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-purple-500 h-2 rounded-full" 
-                          style={{ width: `${[32, 24, 18, 15, 11][index]}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              
+              <div className="bg-blue-50 rounded-lg p-6 text-center">
+                <BarChart3 className="w-12 h-12 text-blue-500 mx-auto mb-3" />
+                <h4 className="font-medium text-blue-900 mb-2">Analytics Module</h4>
+                <p className="text-blue-700 text-sm">
+                  This section will include incongruence detection algorithms and visualization tools.
+                </p>
               </div>
             </div>
           )}
@@ -279,45 +551,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'settings' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">System Settings</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">API Configuration</h3>
                 <p className="text-gray-600 mb-4">
-                  Configure assessment parameters and system behavior.
+                  Coming in Part 3: API key management for LLM services
                 </p>
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-gray-900">Enable Analytics Tracking</h4>
-                    <p className="text-sm text-gray-600">Track user interactions for improvement</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-gray-900">Auto-save Progress</h4>
-                    <p className="text-sm text-gray-600">Save user progress automatically</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">Assessment Timeout</h4>
-                  <p className="text-sm text-gray-600 mb-3">Maximum time allowed per assessment section</p>
-                  <select className="w-full p-2 border border-gray-300 rounded-lg">
-                    <option>15 minutes</option>
-                    <option>30 minutes</option>
-                    <option>45 minutes</option>
-                    <option>No timeout</option>
-                  </select>
-                </div>
+              
+              <div className="bg-purple-50 rounded-lg p-6 text-center">
+                <Key className="w-12 h-12 text-purple-500 mx-auto mb-3" />
+                <h4 className="font-medium text-purple-900 mb-2">API Settings</h4>
+                <p className="text-purple-700 text-sm">
+                  This section will include secure API key management and configuration options.
+                </p>
               </div>
             </div>
           )}
