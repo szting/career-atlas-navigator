@@ -4,8 +4,10 @@ import { RIASECAssessment } from './components/RIASECAssessment';
 import { SkillsAssessment } from './components/SkillsAssessment';
 import { WorkValuesAssessment } from './components/WorkValuesAssessment';
 import { ResultsScreen } from './components/ResultsScreen';
+import { AdminPanel } from './components/AdminPanel';
 import { GameState, RIASECScore } from './types';
 import { calculateCareerMatches } from './utils/careerMatcher';
+import { Settings } from 'lucide-react';
 
 function App() {
   const [gameState, setGameState] = useState<GameState>({
@@ -27,6 +29,8 @@ function App() {
     recommendedCareers: [],
     gameProgress: 0
   });
+
+  const [showAdmin, setShowAdmin] = useState(false);
 
   const handleStart = () => {
     setGameState(prev => ({
@@ -117,7 +121,16 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      {/* Admin Access Button */}
+      <button
+        onClick={() => setShowAdmin(true)}
+        className="fixed top-4 right-4 z-40 p-3 bg-gray-800 text-white rounded-full hover:bg-gray-700 transition-colors shadow-lg"
+        title="Admin Panel"
+      >
+        <Settings className="w-5 h-5" />
+      </button>
+
       {gameState.currentStep === 'welcome' && (
         <WelcomeScreen onStart={handleStart} />
       )}
@@ -149,6 +162,11 @@ function App() {
           recommendedCareers={gameState.recommendedCareers}
           onRestart={handleRestart}
         />
+      )}
+
+      {/* Admin Panel Modal */}
+      {showAdmin && (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
       )}
     </div>
   );
