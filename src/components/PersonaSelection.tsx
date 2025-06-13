@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Users, UserCheck, ArrowRight } from 'lucide-react';
+import { User, Users, UserCheck } from 'lucide-react';
 import { PersonaType } from '../types';
 
 interface PersonaSelectionProps {
@@ -9,55 +9,58 @@ interface PersonaSelectionProps {
 export const PersonaSelection: React.FC<PersonaSelectionProps> = ({ onPersonaSelect }) => {
   const personas = [
     {
-      id: 'individual' as PersonaType,
-      title: 'Individual Career Explorer',
-      description: 'Discover your ideal career pathways based on your RIASEC personality profile, skills, and values.',
+      type: 'individual' as PersonaType,
+      title: 'Individual Professional',
+      description: 'Discover your ideal career path and get personalized recommendations',
       icon: User,
       color: 'from-blue-500 to-indigo-600',
+      bgColor: 'bg-blue-50',
       features: [
-        'Personalized career recommendations',
-        'Detailed pathway exploration',
-        'Skills development insights',
-        'Industry trend analysis'
+        'Personal career assessment',
+        'Skill development roadmap',
+        'Career path recommendations',
+        'Work-life balance insights'
       ]
     },
     {
-      id: 'coach' as PersonaType,
-      title: 'Career Coach/Adviser',
-      description: 'Generate targeted coaching questions and conversation starters based on RIASEC assessments.',
-      icon: Users,
+      type: 'coach' as PersonaType,
+      title: 'Career Coach',
+      description: 'Access coaching tools and frameworks to guide your clients',
+      icon: UserCheck,
       color: 'from-green-500 to-emerald-600',
+      bgColor: 'bg-green-50',
       features: [
-        'RIASEC-based coaching questions',
-        'Conversation frameworks',
-        'Development planning tools',
+        'Client assessment tools',
+        'Coaching conversation starters',
+        'Development planning templates',
         'Progress tracking insights'
       ]
     },
     {
-      id: 'manager' as PersonaType,
-      title: 'Supervisor/Line Manager',
-      description: 'Create meaningful reflection questions for team development and performance conversations.',
-      icon: UserCheck,
-      color: 'from-purple-500 to-violet-600',
+      type: 'manager' as PersonaType,
+      title: 'People Manager',
+      description: 'Support your team members\' career development and growth',
+      icon: Users,
+      color: 'from-purple-500 to-pink-600',
+      bgColor: 'bg-purple-50',
       features: [
-        'Team development questions',
-        'Performance reflection tools',
-        'Career planning frameworks',
-        'Management conversation guides'
+        'Team development insights',
+        'One-on-one conversation guides',
+        'Career progression planning',
+        'Skills gap analysis'
       ]
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 pt-8">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Choose Your Role
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Select your role to access tailored features and insights based on RIASEC career assessment framework.
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Select the option that best describes your current role to get a personalized experience
           </p>
         </div>
 
@@ -66,51 +69,37 @@ export const PersonaSelection: React.FC<PersonaSelectionProps> = ({ onPersonaSel
             const IconComponent = persona.icon;
             return (
               <div
-                key={persona.id}
-                className="bg-white rounded-3xl shadow-2xl p-8 hover:shadow-3xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group"
-                onClick={() => onPersonaSelect(persona.id)}
+                key={persona.type}
+                className="bg-white rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                onClick={() => onPersonaSelect(persona.type)}
               >
-                <div className="text-center mb-6">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r ${persona.color} rounded-full mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                    <IconComponent className="w-8 h-8 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                    {persona.title}
-                  </h2>
-                  <p className="text-gray-600 mb-6">
-                    {persona.description}
-                  </p>
+                <div className={`w-16 h-16 ${persona.bgColor} rounded-2xl flex items-center justify-center mb-6`}>
+                  <IconComponent className="w-8 h-8 text-gray-700" />
                 </div>
+                
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  {persona.title}
+                </h3>
+                
+                <p className="text-gray-600 mb-6">
+                  {persona.description}
+                </p>
 
-                <div className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-8">
                   {persona.features.map((feature, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-gray-700 text-sm">{feature}</span>
-                    </div>
+                    <li key={index} className="flex items-center text-gray-700">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
+                      {feature}
+                    </li>
                   ))}
-                </div>
+                </ul>
 
-                <button className={`w-full bg-gradient-to-r ${persona.color} text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center group-hover:scale-105`}>
+                <button className={`w-full bg-gradient-to-r ${persona.color} text-white py-3 px-6 rounded-xl font-semibold hover:opacity-90 transition-opacity`}>
                   Get Started
-                  <ArrowRight className="w-5 h-5 ml-2" />
                 </button>
               </div>
             );
           })}
-        </div>
-
-        <div className="text-center mt-12">
-          <div className="bg-white rounded-2xl shadow-lg p-6 max-w-2xl mx-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              About RIASEC Framework
-            </h3>
-            <p className="text-gray-600 text-sm">
-              The RIASEC model identifies six personality types: <strong>Realistic</strong>, <strong>Investigative</strong>, 
-              <strong>Artistic</strong>, <strong>Social</strong>, <strong>Enterprising</strong>, and <strong>Conventional</strong>. 
-              This assessment helps match individuals with suitable career environments and development opportunities.
-            </p>
-          </div>
         </div>
       </div>
     </div>
