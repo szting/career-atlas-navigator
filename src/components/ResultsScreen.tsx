@@ -138,73 +138,89 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
           <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
             Recommended Career Paths
           </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recommendedCareers.map((career) => (
-              <div key={career.id} className="bg-white rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-shadow duration-300">
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{career.title}</h3>
-                    {career.matchScore && (
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium">
-                        {career.matchScore}% match
-                      </span>
-                    )}
+          {recommendedCareers.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recommendedCareers.map((career) => (
+                <div key={career.id} className="bg-white rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-shadow duration-300">
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-bold text-gray-900">{career.title}</h3>
+                      {career.matchScore && (
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium">
+                          {career.matchScore}% match
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4">{career.description}</p>
                   </div>
-                  <p className="text-gray-600 text-sm mb-4">{career.description}</p>
-                </div>
 
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-start space-x-2">
-                    <DollarSign className="w-4 h-4 text-green-500 mt-0.5" />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">Salary Range</span>
-                      <p className="text-sm text-gray-600">{career.salaryRange}</p>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-start space-x-2">
+                      <DollarSign className="w-4 h-4 text-green-500 mt-0.5" />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Salary Range</span>
+                        <p className="text-sm text-gray-600">{career.salaryRange}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-2">
+                      <TrendingUp className="w-4 h-4 text-blue-500 mt-0.5" />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Growth Outlook</span>
+                        <p className="text-sm text-gray-600">{career.growthOutlook}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-2">
+                      <GraduationCap className="w-4 h-4 text-purple-500 mt-0.5" />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Education</span>
+                        <p className="text-sm text-gray-600">{career.education}</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-2">
-                    <TrendingUp className="w-4 h-4 text-blue-500 mt-0.5" />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">Growth Outlook</span>
-                      <p className="text-sm text-gray-600">{career.growthOutlook}</p>
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-gray-900">Required Skills:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {career.requiredSkills.slice(0, 3).map((skill) => (
+                        <span
+                          key={skill}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                      {career.requiredSkills.length > 3 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                          +{career.requiredSkills.length - 3} more
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-2">
-                    <GraduationCap className="w-4 h-4 text-purple-500 mt-0.5" />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">Education</span>
-                      <p className="text-sm text-gray-600">{career.education}</p>
-                    </div>
-                  </div>
+                  <button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center">
+                    Learn More
+                    <ExternalLink className="w-4 h-4 ml-2" />
+                  </button>
                 </div>
-
-                <div className="mb-4">
-                  <span className="text-sm font-medium text-gray-900">Required Skills:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {career.requiredSkills.slice(0, 3).map((skill) => (
-                      <span
-                        key={skill}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {career.requiredSkills.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                        +{career.requiredSkills.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center">
-                  Learn More
-                  <ExternalLink className="w-4 h-4 ml-2" />
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <p className="text-gray-600 mb-4">
+                No career recommendations available at the moment. This might be due to:
+              </p>
+              <ul className="text-left text-gray-600 mb-6 max-w-md mx-auto">
+                <li className="mb-2">• Incomplete assessment data</li>
+                <li className="mb-2">• Error in career matching algorithm</li>
+                <li className="mb-2">• No careers matching your profile</li>
+              </ul>
+              <p className="text-gray-600">
+                Please try retaking the assessment or contact support if the issue persists.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
