@@ -62,3 +62,64 @@ export interface FileValidationResult {
   recordCount: number;
   preview: any[];
 }
+
+// Analytics types
+export interface IncongruenceData {
+  userId: string;
+  userName: string;
+  assessmentDate: string;
+  riasecScores: {
+    realistic: number;
+    investigative: number;
+    artistic: number;
+    social: number;
+    enterprising: number;
+    conventional: number;
+  };
+  skillsConfidence: {
+    realistic: number;
+    investigative: number;
+    artistic: number;
+    social: number;
+    enterprising: number;
+    conventional: number;
+  };
+  incongruenceScore: number;
+  topMismatches: Array<{
+    dimension: string;
+    interestScore: number;
+    skillScore: number;
+    gap: number;
+  }>;
+}
+
+export interface AnalyticsMetrics {
+  totalAssessments: number;
+  averageIncongruence: number;
+  highIncongruenceCount: number;
+  commonMismatches: Array<{
+    dimension: string;
+    frequency: number;
+    averageGap: number;
+  }>;
+}
+
+// API Configuration types
+export interface LLMProvider {
+  id: string;
+  name: string;
+  endpoint: string;
+  modelOptions: string[];
+  authType: 'bearer' | 'api-key' | 'custom';
+  headers?: Record<string, string>;
+}
+
+export interface APIConfiguration {
+  provider: string;
+  apiKey: string;
+  model?: string;
+  endpoint?: string;
+  customHeaders?: Record<string, string>;
+  maxTokens?: number;
+  temperature?: number;
+}

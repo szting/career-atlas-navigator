@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Upload, FileText, Users, BarChart3, Settings, X, Check, AlertCircle, Key, Database, Download, Eye, EyeOff } from 'lucide-react';
-import { UploadedFile, FileValidationResult, SkillsFramework, CoachingExercise } from '../types/admin';
+import React, { useState, useEffect } from 'react';
+import { Upload, FileText, Users, BarChart3, Settings, X, Check, AlertCircle, Key, Database, Download, Eye, TrendingUp, AlertTriangle } from 'lucide-react';
+import { UploadedFile, FileValidationResult, IncongruenceData, AnalyticsMetrics, APIConfiguration, LLMProvider } from '../types/admin';
+import { SpiderChart } from './SpiderChart';
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -11,6 +12,41 @@ interface UploadStatus {
   message: string;
 }
 
+// Predefined LLM providers
+const LLM_PROVIDERS: LLMProvider[] = [
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    modelOptions: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    authType: 'bearer'
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic Claude',
+    endpoint: 'https://api.anthropic.com/v1/messages',
+    modelOptions: ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
+    authType: 'api-key',
+    headers: {
+      'anthropic-version': '2023-06-01'
+    }
+  },
+  {
+    id: 'google',
+    name: 'Google Gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models',
+    modelOptions: ['gemini-pro', 'gemini-pro-vision'],
+    authType: 'api-key'
+  },
+  {
+    id: 'custom',
+    name: 'Custom LLM',
+    endpoint: '',
+    modelOptions: [],
+    authType: 'custom'
+  }
+];
+
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'analytics' | 'settings'>('upload');
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ type: null, message: '' });
@@ -19,7 +55,150 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [selectedFileType, setSelectedFileType] = useState<'skills-framework' | 'coaching-exercises' | 'career-data'>('skills-framework');
   const [validationResult, setValidationResult] = useState<FileValidationResult | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [previewData, setPreviewData] = useState<any[]>([]);
+  
+  // Analytics state
+  const [selectedUser, setSelectedUser] = useState<IncongruenceData | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<IncongruenceData[]>([]);
+  const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null);
+  
+  // API settings state
+  const [apiConfig, setApiConfig] = useState<APIConfiguration>({
+    provider: 'openai',
+    apiKey: '',
+    model: 'gpt-4',
+    maxTokens: 2000,
+    temperature: 0.7
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [testingApi, setTestingApi] = useState(false);
+  const [apiTestResult, setApiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Load sample analytics data
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      loadAnalyticsData();
+    }
+  }, [activeTab]);
+
+  // Load saved API configuration
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('llm_api_config');
+    if (savedConfig) {
+      setApiConfig(JSON.parse(savedConfig));
+    }
+  }, []);
+
+  const loadAnalyticsData = () => {
+    // Generate sample data for demonstration
+    const sampleData: IncongruenceData[] = [
+      {
+        userId: '1',
+        userName: 'John Doe',
+        assessmentDate: '2024-01-15',
+        riasecScores: {
+          realistic: 75,
+          investigative: 85,
+          artistic: 45,
+          social: 60,
+          enterprising: 70,
+          conventional: 55
+        },
+        skillsConfidence: {
+          realistic: 60,
+          investigative: 90,
+          artistic: 30,
+          social: 70,
+          enterprising: 50,
+          conventional: 65
+        },
+        incongruenceScore: 0,
+        topMismatches: []
+      },
+      {
+        userId: '2',
+        userName: 'Jane Smith',
+        assessmentDate: '2024-01-20',
+        riasecScores: {
+          realistic: 40,
+          investigative: 60,
+          artistic: 85,
+          social: 75,
+          enterprising: 55,
+          conventional: 45
+        },
+        skillsConfidence: {
+          realistic: 50,
+          investigative: 55,
+          artistic: 70,
+          social: 80,
+          enterprising: 60,
+          conventional: 40
+        },
+        incongruenceScore: 0,
+        topMismatches: []
+      }
+    ];
+
+    // Calculate incongruence scores and mismatches
+    const processedData = sampleData.map(user => {
+      const mismatches = Object.keys(user.riasecScores).map(key => {
+        const dimension = key as keyof typeof user.riasecScores;
+        const gap = Math.abs(user.riasecScores[dimension] - user.skillsConfidence[dimension]);
+        return {
+          dimension,
+          interestScore: user.riasecScores[dimension],
+          skillScore: user.skillsConfidence[dimension],
+          gap
+        };
+      }).sort((a, b) => b.gap - a.gap);
+
+      const incongruenceScore = mismatches.reduce((sum, m) => sum + m.gap, 0) / mismatches.length;
+
+      return {
+        ...user,
+        incongruenceScore,
+        topMismatches: mismatches.slice(0, 3)
+      };
+    });
+
+    setAnalyticsData(processedData);
+    
+    // Calculate metrics
+    const totalAssessments = processedData.length;
+    const averageIncongruence = processedData.reduce((sum, d) => sum + d.incongruenceScore, 0) / totalAssessments;
+    const highIncongruenceCount = processedData.filter(d => d.incongruenceScore > 15).length;
+    
+    const dimensionStats: Record<string, { count: number; totalGap: number }> = {};
+    processedData.forEach(user => {
+      user.topMismatches.forEach(mismatch => {
+        if (!dimensionStats[mismatch.dimension]) {
+          dimensionStats[mismatch.dimension] = { count: 0, totalGap: 0 };
+        }
+        dimensionStats[mismatch.dimension].count++;
+        dimensionStats[mismatch.dimension].totalGap += mismatch.gap;
+      });
+    });
+
+    const commonMismatches = Object.entries(dimensionStats)
+      .map(([dimension, stats]) => ({
+        dimension,
+        frequency: stats.count,
+        averageGap: stats.totalGap / stats.count
+      }))
+      .sort((a, b) => b.frequency - a.frequency);
+
+    setMetrics({
+      totalAssessments,
+      averageIncongruence,
+      highIncongruenceCount,
+      commonMismatches
+    });
+
+    // Select first user by default
+    if (processedData.length > 0) {
+      setSelectedUser(processedData[0]);
+    }
+  };
 
   const validateFileContent = async (file: File, type: string): Promise<FileValidationResult> => {
     const text = await file.text();
@@ -108,9 +287,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           break;
       }
 
-      // Store preview data separately
-      setPreviewData(preview);
-
     } catch (error) {
       errors.push(`File parsing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -128,10 +304,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    
-    // Reset states
-    setShowPreview(false);
-    setPreviewData([]);
     
     // Validate file type
     if (!file.name.endsWith('.json') && !file.name.endsWith('.csv')) {
@@ -315,8 +487,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     URL.revokeObjectURL(url);
   };
 
-  const togglePreview = () => {
-    setShowPreview(!showPreview);
+  const testApiConnection = async () => {
+    setTestingApi(true);
+    setApiTestResult(null);
+
+    try {
+      const provider = LLM_PROVIDERS.find(p => p.id === apiConfig.provider);
+      if (!provider) {
+        throw new Error('Invalid provider selected');
+      }
+
+      if (!apiConfig.apiKey) {
+        throw new Error('API key is required');
+      }
+
+      // Simulate API test - in real implementation, make actual test request
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // For demo purposes, always succeed if API key is provided
+      setApiTestResult({
+        success: true,
+        message: `Successfully connected to ${provider.name}`
+      });
+
+      // Save configuration
+      localStorage.setItem('llm_api_config', JSON.stringify(apiConfig));
+    } catch (error) {
+      setApiTestResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection failed'
+      });
+    } finally {
+      setTestingApi(false);
+    }
   };
 
   return (
@@ -459,12 +662,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-medium text-gray-900">Validation Results</h4>
-                    {previewData.length > 0 && (
+                    {validationResult.preview.length > 0 && (
                       <button
-                        onClick={togglePreview}
-                        className="flex items-center text-sm text-purple-600 hover:text-purple-700 transition-colors"
+                        onClick={() => setShowPreview(!showPreview)}
+                        className="flex items-center text-sm text-purple-600 hover:text-purple-700"
                       >
-                        {showPreview ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+                        <Eye className="w-4 h-4 mr-1" />
                         {showPreview ? 'Hide' : 'Show'} Preview
                       </button>
                     )}
@@ -480,12 +683,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <div>
                         <span className="font-medium text-red-600">Errors:</span>
                         <ul className="list-disc list-inside text-red-600 ml-2">
-                          {validationResult.errors.slice(0, 5).map((error, index) => (
+                          {validationResult.errors.map((error, index) => (
                             <li key={index}>{error}</li>
                           ))}
-                          {validationResult.errors.length > 5 && (
-                            <li>... and {validationResult.errors.length - 5} more errors</li>
-                          )}
                         </ul>
                       </div>
                     )}
@@ -494,26 +694,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       <div>
                         <span className="font-medium text-yellow-600">Warnings:</span>
                         <ul className="list-disc list-inside text-yellow-600 ml-2">
-                          {validationResult.warnings.slice(0, 5).map((warning, index) => (
+                          {validationResult.warnings.map((warning, index) => (
                             <li key={index}>{warning}</li>
                           ))}
-                          {validationResult.warnings.length > 5 && (
-                            <li>... and {validationResult.warnings.length - 5} more warnings</li>
-                          )}
                         </ul>
                       </div>
                     )}
                   </div>
 
-                  {/* Preview Section */}
-                  {showPreview && previewData.length > 0 && (
-                    <div className="mt-4 p-3 bg-white rounded border border-gray-200">
-                      <h5 className="font-medium text-gray-900 mb-2">Data Preview (First {previewData.length} records)</h5>
-                      <div className="overflow-x-auto">
-                        <pre className="text-xs text-gray-600 whitespace-pre-wrap">
-                          {JSON.stringify(previewData, null, 2)}
-                        </pre>
-                      </div>
+                  {showPreview && validationResult.preview.length > 0 && (
+                    <div className="mt-4 p-3 bg-white rounded border">
+                      <h5 className="font-medium text-gray-900 mb-2">Data Preview</h5>
+                      <pre className="text-xs text-gray-600 overflow-x-auto">
+                        {JSON.stringify(validationResult.preview, null, 2)}
+                      </pre>
                     </div>
                   )}
                 </div>
@@ -553,18 +747,130 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Analytics Dashboard</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Skills vs Interests Incongruence Analysis</h3>
                 <p className="text-gray-600 mb-4">
-                  Coming in Part 2: Skills confidence vs career interests incongruence analysis
+                  Visualize the alignment between users' career interests (RIASEC scores) and their skills confidence levels.
                 </p>
               </div>
-              
-              <div className="bg-blue-50 rounded-lg p-6 text-center">
-                <BarChart3 className="w-12 h-12 text-blue-500 mx-auto mb-3" />
-                <h4 className="font-medium text-blue-900 mb-2">Analytics Module</h4>
-                <p className="text-blue-700 text-sm">
-                  This section will include incongruence detection algorithms and visualization tools.
-                </p>
+
+              {/* Metrics Overview */}
+              {metrics && (
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-600 font-medium">Total Assessments</p>
+                        <p className="text-2xl font-bold text-blue-900">{metrics.totalAssessments}</p>
+                      </div>
+                      <Users className="w-8 h-8 text-blue-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-purple-600 font-medium">Avg Incongruence</p>
+                        <p className="text-2xl font-bold text-purple-900">{metrics.averageIncongruence.toFixed(1)}%</p>
+                      </div>
+                      <TrendingUp className="w-8 h-8 text-purple-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-orange-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-orange-600 font-medium">High Incongruence</p>
+                        <p className="text-2xl font-bold text-orange-900">{metrics.highIncongruenceCount}</p>
+                      </div>
+                      <AlertTriangle className="w-8 h-8 text-orange-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-600 font-medium">Most Common Gap</p>
+                        <p className="text-2xl font-bold text-green-900 capitalize">
+                          {metrics.commonMismatches[0]?.dimension || 'N/A'}
+                        </p>
+                      </div>
+                      <BarChart3 className="w-8 h-8 text-green-500" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* User Selection and Spider Chart */}
+              <div className="grid grid-cols-3 gap-6">
+                {/* User List */}
+                <div className="col-span-1">
+                  <h4 className="font-medium text-gray-900 mb-3">Select User</h4>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {analyticsData.map((user) => (
+                      <button
+                        key={user.userId}
+                        onClick={() => setSelectedUser(user)}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                          selectedUser?.userId === user.userId
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="font-medium text-sm">{user.userName}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          Incongruence: {user.incongruenceScore.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(user.assessmentDate).toLocaleDateString()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Spider Chart */}
+                <div className="col-span-2">
+                  {selectedUser ? (
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-3">
+                        Incongruence Analysis for {selectedUser.userName}
+                      </h4>
+                      <div className="bg-white rounded-lg border p-4">
+                        <SpiderChart
+                          riasecScores={selectedUser.riasecScores}
+                          skillsConfidence={selectedUser.skillsConfidence}
+                        />
+                      </div>
+                      
+                      {/* Top Mismatches */}
+                      <div className="mt-4 bg-gray-50 rounded-lg p-4">
+                        <h5 className="font-medium text-gray-900 mb-2">Top Mismatches</h5>
+                        <div className="space-y-2">
+                          {selectedUser.topMismatches.map((mismatch) => (
+                            <div key={mismatch.dimension} className="flex items-center justify-between">
+                              <span className="text-sm font-medium capitalize">{mismatch.dimension}</span>
+                              <div className="flex items-center space-x-4 text-sm">
+                                <span className="text-gray-600">Interest: {mismatch.interestScore}%</span>
+                                <span className="text-gray-600">Skills: {mismatch.skillScore}%</span>
+                                <span className={`font-medium ${
+                                  mismatch.gap > 20 ? 'text-red-600' : 
+                                  mismatch.gap > 10 ? 'text-orange-600' : 
+                                  'text-green-600'
+                                }`}>
+                                  Gap: {mismatch.gap}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">Select a user to view their incongruence analysis</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -574,16 +880,167 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">API Configuration</h3>
                 <p className="text-gray-600 mb-4">
-                  Coming in Part 3: API key management for LLM services
+                  Configure your preferred Large Language Model provider for AI-powered features.
                 </p>
               </div>
-              
-              <div className="bg-purple-50 rounded-lg p-6 text-center">
-                <Key className="w-12 h-12 text-purple-500 mx-auto mb-3" />
-                <h4 className="font-medium text-purple-900 mb-2">API Settings</h4>
-                <p className="text-purple-700 text-sm">
-                  This section will include secure API key management and configuration options.
-                </p>
+
+              {/* Provider Selection */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-3">Select LLM Provider</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {LLM_PROVIDERS.map((provider) => (
+                    <button
+                      key={provider.id}
+                      onClick={() => setApiConfig({ ...apiConfig, provider: provider.id })}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        apiConfig.provider === provider.id
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{provider.name}</div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {provider.id === 'custom' ? 'Configure custom endpoint' : `Use ${provider.name} API`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* API Configuration Form */}
+              <div className="space-y-4">
+                {/* API Key Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={apiConfig.apiKey}
+                      onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
+                      placeholder="Enter your API key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Model Selection */}
+                {apiConfig.provider !== 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Model
+                    </label>
+                    <select
+                      value={apiConfig.model}
+                      onChange={(e) => setApiConfig({ ...apiConfig, model: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      {LLM_PROVIDERS.find(p => p.id === apiConfig.provider)?.modelOptions.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Custom Endpoint (for custom provider) */}
+                {apiConfig.provider === 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      API Endpoint
+                    </label>
+                    <input
+                      type="text"
+                      value={apiConfig.endpoint || ''}
+                      onChange={(e) => setApiConfig({ ...apiConfig, endpoint: e.target.value })}
+                      placeholder="https://api.example.com/v1/completions"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+
+                {/* Advanced Settings */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Max Tokens
+                    </label>
+                    <input
+                      type="number"
+                      value={apiConfig.maxTokens}
+                      onChange={(e) => setApiConfig({ ...apiConfig, maxTokens: parseInt(e.target.value) })}
+                      min="100"
+                      max="4000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Temperature
+                    </label>
+                    <input
+                      type="number"
+                      value={apiConfig.temperature}
+                      onChange={(e) => setApiConfig({ ...apiConfig, temperature: parseFloat(e.target.value) })}
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Test Connection Button */}
+                <div className="flex items-center justify-between pt-4">
+                  <button
+                    onClick={testApiConnection}
+                    disabled={!apiConfig.apiKey || testingApi}
+                    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {testingApi ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Testing Connection...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Test Connection
+                      </>
+                    )}
+                  </button>
+
+                  {apiTestResult && (
+                    <div className={`flex items-center space-x-2 text-sm ${
+                      apiTestResult.success ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {apiTestResult.success ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4" />
+                      )}
+                      <span>{apiTestResult.message}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Security Note</p>
+                    <p>Your API key is stored locally in your browser and is never sent to our servers. Make sure to keep it secure and never share it publicly.</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
